@@ -155,6 +155,11 @@ function R:stop()
     end
 end
 
+--- Checks if the animation runner is running.
+function R:is_running()
+    return not not pcall(vim.uv.is_active, self._timer)
+end
+
 --- Restarts the animation runner.
 function R:restart()
     if not self._timer:is_active() then
@@ -187,7 +192,7 @@ end
 ---@param animation fltanim.animation Animation id
 ---@return boolean is_paused
 function R:animation_is_paused(animation)
-    return not not self._paused[animation]
+    return not self:is_running() or self._paused[animation]
 end
 
 ---@class fltanim.buf_animator_item
@@ -407,9 +412,10 @@ local M = {}
 function M.new(fps, on_frame)
     vim.validate('fps', fps, 'number')
     vim.validate('on_frame', on_frame, 'callable', true)
+    ---@type fltanim.runner
     local runner = {
         _fps = fps,
-        _timer = vim.uv.new_timer(),
+        _timer = assert(vim.uv.new_timer()),
         _on_frame = { on_frame },
         _items = {},
         _paused = {},
