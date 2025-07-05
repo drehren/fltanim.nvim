@@ -52,7 +52,8 @@ function R:create_animation(animation, duration)
     vim.validate('duration', duration, 'number')
     vim.validate('duration', duration, gt0, 'greater than zero')
 
-    self._items[#self._items + 1] = {
+    local id = #self._items + 1
+    self._items[id] = {
         animation = animation,
         duration = duration,
         frame_time = duration / #animation,
@@ -62,7 +63,7 @@ function R:create_animation(animation, duration)
 
     self:_activate()
 
-    return #self._items
+    return id
 end
 
 ---@param on_frame fltanim.callback
@@ -96,12 +97,12 @@ function R:_activate()
     weakme.me = self
     local timer = self._timer
     self._timer:start(0, 1000 / self._fps, function()
-        if not weakme.me then
+        local me = weakme.me
+        if not me then
             timer:stop()
             timer:close()
             return
         end
-        local me = weakme.me
         local hr1 = hrtime()
         local delay = (hr1 - weakme.me._hr0) * 1e-6
         weakme.me._hr0 = hr1
@@ -143,7 +144,7 @@ end
 function R:animation_delete(animation)
     vim.validate('animation', animation, 'number')
     if self._items[animation] then
-        self._items[animation] = nil
+        self._items[animation] = false
         self._removed = self._removed + 1
     end
 end
