@@ -1,5 +1,9 @@
 -- A barebones animation system for neovim
 
+local buf_get_extmark_by_id = vim.api.nvim_buf_get_extmark_by_id
+local buf_set_extmark = vim.api.nvim_buf_set_extmark
+local buf_del_extmark = vim.api.nvim_buf_del_extmark
+
 ---@alias fltanim.animation integer
 
 ---@private
@@ -108,10 +112,11 @@ function R:_activate()
         weakme.me._hr0 = hr1
 
         local updates = {}
+        local mfloor = math.floor
         for id, a in pairs(me._items) do
             if a and not me._paused[id] then
                 a.last_time = (a.last_time + delay) % a.duration
-                local frame = math.floor(a.last_time / a.frame_time)
+                local frame = mfloor(a.last_time / a.frame_time)
                 if frame ~= a.last_frame then
                     a.last_frame = frame
                     if a.animation then
@@ -246,13 +251,12 @@ function B:set_animation(buf, line, col, animation, opts)
     opts = opts or {}
     vim.validate('opts.pos', opts.pos, 'string', true)
 
-    local markid =
-        vim.api.nvim_buf_set_extmark(buf, self._ns, line - 1, col - 1, {
-            virt_text_pos = opts.pos or 'inline',
-            invalidate = true,
-            undo_restore = false,
-            strict = false,
-        })
+    local markid = buf_set_extmark(buf, self._ns, line - 1, col - 1, {
+        virt_text_pos = opts.pos or 'inline',
+        invalidate = true,
+        undo_restore = false,
+        strict = false,
+    })
 
     opts.pos = nil
 
@@ -280,12 +284,7 @@ function B:set_animation_mark(buf, animation, mark_ns, mark_id, opts)
 
     opts = opts or {}
 
-    local emd = vim.api.nvim_buf_get_extmark_by_id(
-        buf,
-        mark_ns,
-        mark_id,
-        { details = true }
-    )
+    local emd = buf_get_extmark_by_id(buf, mark_ns, mark_id, { details = true })
     assert(#emd > 0, 'extmark does not exist')
     emd[3].ns_id = nil
 
@@ -327,7 +326,7 @@ function B:set_animation_mark(buf, animation, mark_ns, mark_id, opts)
     local animid =
         self._runner:create_animation(frames, opts.duration or duration)
 
-    vim.api.nvim_buf_set_extmark(buf, mark_ns, emd[1], emd[2], emd[3])
+    buf_set_extmark(buf, mark_ns, emd[1], emd[2], emd[3])
     self._bufanim[animid] = {
         buf = buf,
         em = mark_id,
@@ -370,7 +369,7 @@ function B:animation_delete(animation)
             if not vim.api.nvim_buf_is_valid(banim.buf) then
                 return
             end
-            vim.api.nvim_buf_del_extmark(banim.buf, self._ns, banim.em)
+            buf_del_extmark(banim.buf, self._ns, banim.em)
         end)
     end
 end
@@ -390,16 +389,15 @@ B.__call = vim.schedule_wrap(function(self, items)
     for _, item in ipairs(items) do
         local a = self._bufanim[item.id]
         if a then
-            local e =
-                vim.api.nvim_buf_get_extmark_by_id(a.buf, self._ns, a.em, {
-                    details = true,
-                })
+            local e = buf_get_extmark_by_id(a.buf, self._ns, a.em, {
+                details = true,
+            })
             if #e > 0 and not e[3].invalid then
                 e[3].virt_text[1][a.em_pos] = item.frame
                 e[3].ns_id = nil
                 ---@cast e {[1]: integer, [2]: integer, [3]: vim.api.keyset.set_extmark}
                 e[3].id = a.em
-                vim.api.nvim_buf_set_extmark(a.buf, self._ns, e[1], e[2], e[3])
+                buf_set_extmark(a.buf, self._ns, e[1], e[2], e[3])
             end
         end
     end
